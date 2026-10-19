@@ -17,10 +17,32 @@ from tkinter import filedialog, messagebox, ttk
 APP_NAME = "BlueGuard Bluetooth Scanner"
 VERSION = "1.0.0-2"
 MAC_RE = re.compile(r"^(?:[0-9A-F]{2}:){5}[0-9A-F]{2}$")
-FIELDS = ["address", "name", "transport", "rssi_dbm", "last_seen_utc"]
+FIELDS = ["address", "name", "device_hint", "transport", "rssi_dbm", "last_seen_utc"]
 
 def now_utc():
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def guess_device_hint(name):
+    """Best-effort label from the advertised name only; not OS fingerprinting."""
+    value = (name or "").strip().lower()
+    if not value:
+        return "Other/Unknown"
+    audio_tokens = ("airpods", "buds", "headphone", "headset", "speaker", "soundbar",
+                    "jbl", "bose", "sony wh", "sony wf", "beats", "earbuds", "soundcore")
+    if any(token in value for token in audio_tokens):
+        return "Audio"
+    android_tokens = ("android", "pixel", "galaxy", "redmi", "xiaomi", "oneplus",
+                      "oppo", "vivo", "realme", "iqoo", "huawei", "honor", "motorola")
+    if any(token in value for token in android_tokens):
+        return "Android (likely)"
+    mac_tokens = ("macbook", "imac", "mac mini", "mac studio", "mac pro")
+    if any(token in value for token in mac_tokens):
+        return "macOS (likely)"
+    windows_tokens = ("windows", "surface", "xbox", "desktop-", "laptop-", "pc-")
+    if any(token in value for token in windows_tokens):
+        return "Windows (likely)"
+    return "Other/Unknown"
 
 class BlueGuard:
     def __init__(self, root):
@@ -83,6 +105,25 @@ class BlueGuard:
         ttk.Button(controls,text="Export CSV",command=self.export_csv).grid(row=1,column=4,padx=4)
         ttk.Button(controls,text="Export JSON",command=self.export_json).grid(row=1,column=5,padx=4)
 
+        filters = ttk.Frame(outer, style="Panel.TFrame", padding=10)
+        filters.pack(fill="x", pady=(0,10))
+        ttk.Label(filters, text="Filter by name", style="Muted.TLabel").grid(row=0,column=0,sticky="w")
+        self.name_filter = tk.StringVar()
+        ttk.Entry(filters, textvariable=self.name_filter, width=24).grid(row=1,column=0,padx=(0,10))
+        ttk.Label(filters, text="Filter by MAC", style="Muted.TLabel").grid(row=0,column=1,sticky="w")
+        self.mac_filter = tk.StringVar()
+        ttk.Entry(filters, textvariable=self.mac_filter, width=22).grid(row=1,column=1,padx=(0,10))
+        ttk.Label(filters, text="Likely device type", style="Muted.TLabel").grid(row=0,column=2,sticky="w")
+        self.hint_filter = tk.StringVar(value="All")
+        self.hint_box = ttk.Combobox(filters, textvariable=self.hint_filter,
+            values=["All","Android (likely)","Windows (likely)","macOS (likely)","Audio","Other/Unknown"],
+            state="readonly", width=19)
+        self.hint_box.grid(row=1,column=2,padx=(0,10))
+        ttk.Button(filters, text="Clear filters", command=self.clear_filters).grid(row=1,column=3,padx=4)
+        self.name_filter.trace_add("write", self.apply_filters)
+        self.mac_filter.trace_add("write", self.apply_filters)
+        self.hint_filter.trace_add("write", self.apply_filters)
+
         connect = ttk.Frame(outer,style="Panel.TFrame",padding=10)
         connect.pack(fill="x",pady=(0,10))
         ttk.Label(connect,text="Device MAC address",style="Muted.TLabel").grid(row=0,column=0,sticky="w")
@@ -100,10 +141,10 @@ class BlueGuard:
         ttk.Label(statusrow,textvariable=self.status).pack(side="left")
         self.count = tk.StringVar(value="0 devices")
         ttk.Label(statusrow,textvariable=self.count).pack(side="right")
-        cols = ("address","name","transport","rssi_dbm","last_seen_utc")
+        cols = ("address","name","device_hint","transport","rssi_dbm","last_seen_utc")
         self.tree = ttk.Treeview(outer,columns=cols,show="headings",selectmode="browse")
-        titles = {"address":"MAC address","name":"Advertised name","transport":"Mode","rssi_dbm":"RSSI dBm","last_seen_utc":"Last seen (UTC)"}
-        widths = {"address":170,"name":250,"transport":110,"rssi_dbm":85,"last_seen_utc":190}
+        titles = {"address":"MAC address","name":"Advertised name","device_hint":"Likely type (hint)","transport":"Mode","rssi_dbm":"RSSI dBm","last_seen_utc":"Last seen (UTC)"}
+        widths = {"address":150,"name":210,"device_hint":135,"transport":105,"rssi_dbm":80,"last_seen_utc":180}
         for col in cols:
             self.tree.heading(col,text=titles[col]); self.tree.column(col,width=widths[col],anchor="w")
         self.tree.pack(fill="both",expand=True)
@@ -207,8 +248,10 @@ class BlueGuard:
                 kind,payload = self.events.get_nowait()
                 if kind == "device":
                     addr,name,mode = payload
-                    d = self.devices.setdefault(addr,{"address":addr,"name":"","transport":mode,"rssi_dbm":None,"last_seen_utc":now_utc()})
-                    if name: d["name"] = name
+                    d = self.devices.setdefault(addr,{"address":addr,"name":"","device_hint":"Other/Unknown","transport":mode,"rssi_dbm":None,"last_seen_utc":now_utc()})
+                    if name:
+                        d["name"] = name
+                        d["device_hint"] = guess_device_hint(name)
                     if d["transport"] != mode: d["transport"] = "Classic + BLE"
                     d["last_seen_utc"] = now_utc(); self._refresh(addr)
                     self.log(f"Discovered {addr} {name}".rstrip())
@@ -231,12 +274,38 @@ class BlueGuard:
             pass
         self.root.after(150,self._poll)
 
+    def _matches_filters(self, d):
+        name_q = self.name_filter.get().strip().casefold()
+        mac_q = self.mac_filter.get().strip().casefold()
+        hint_q = self.hint_filter.get()
+        if name_q and name_q not in (d.get("name") or "").casefold():
+            return False
+        if mac_q and mac_q not in d["address"].casefold():
+            return False
+        if hint_q != "All" and d.get("device_hint", "Other/Unknown") != hint_q:
+            return False
+        return True
+
     def _refresh(self,addr):
         d = self.devices[addr]
-        vals = (addr,d["name"] or "(name not advertised)",d["transport"],"" if d["rssi_dbm"] is None else d["rssi_dbm"],d["last_seen_utc"])
+        if not self._matches_filters(d):
+            if self.tree.exists(addr):
+                self.tree.delete(addr)
+            self.count.set(f"{len(self.tree.get_children())} shown / {len(self.devices)} discovered")
+            return
+        vals = (addr,d["name"] or "(name not advertised)",d.get("device_hint","Other/Unknown"),d["transport"],"" if d["rssi_dbm"] is None else d["rssi_dbm"],d["last_seen_utc"])
         if self.tree.exists(addr): self.tree.item(addr,values=vals)
         else: self.tree.insert("", "end",iid=addr,values=vals)
-        self.count.set(f"{len(self.devices)} device(s) discovered")
+        self.count.set(f"{len(self.tree.get_children())} shown / {len(self.devices)} discovered")
+
+    def apply_filters(self, *_):
+        for addr in list(self.devices):
+            self._refresh(addr)
+
+    def clear_filters(self):
+        self.name_filter.set("")
+        self.mac_filter.set("")
+        self.hint_filter.set("All")
 
     def selected(self,_=None):
         sel = self.tree.selection()
@@ -259,7 +328,7 @@ class BlueGuard:
         if not addr: return
         prompts = {
             "pair":("Pair",f"Pair with {addr}? Only proceed if this is your device or you have explicit permission. Confirm any passkey or pairing prompt on your speaker."),
-            "connect":("Connect",f"Connect to {addr}? The device must support the relevant profile and may need pairing mode."),
+            "connect":("Connect",f"Request a normal Bluetooth connection to {addr}? This may work without a new pairing-code prompt only if the device/profile permits it or the device is already paired. BlueGuard cannot bypass authentication or force access to a protected device."),
             "disconnect":("Disconnect",f"Disconnect {addr}? Only manage a device you own or are authorized to control.")
         }
         title,body = prompts[action]
