@@ -25,7 +25,7 @@ cd blueguard-bluetooth-scanner
 bash run.sh
 ```
 
-Select Classic + BLE, Classic, or BLE and start a scan. Select a device row to populate its MAC address or enter a known address in `AA:BB:CC:DD:EE:FF` format. Pair and Connect prompt for authorization confirmation. Some BlueZ pairing flows require additional terminal interaction or physical confirmation on the speaker.
+Select Classic + BLE, Classic, or BLE and start a scan. Filter live results by advertised device name, full or partial MAC address, and a best-effort likely device type (Android, Windows, macOS, Audio, or Other/Unknown). Type labels are name-based hints only: Bluetooth advertisements do not reliably reveal the operating system, so an unrecognized device remains usable under All or Other/Unknown. Select a device row to populate its MAC address or enter a known address in `AA:BB:CC:DD:EE:FF` format. Pair and Connect prompt for authorization confirmation. Some BlueZ pairing flows require additional terminal interaction or physical confirmation on the speaker. Connect requests a normal connection only; it does not bypass pairing, PIN/passkey requirements, device permissions, or security controls. A device may connect without a new code prompt only when its profile and existing trust/bonding state permit it.
 
 ## Update from terminal
 
