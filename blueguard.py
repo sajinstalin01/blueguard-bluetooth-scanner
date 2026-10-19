@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from tkinter import filedialog, messagebox, ttk
 
 APP_NAME = "BlueGuard Bluetooth Scanner"
-VERSION = "1.0.0-2"
+VERSION = "1.1.0-1"
 MAC_RE = re.compile(r"^(?:[0-9A-F]{2}:){5}[0-9A-F]{2}$")
 FIELDS = ["address", "name", "device_hint", "transport", "rssi_dbm", "last_seen_utc"]
 
