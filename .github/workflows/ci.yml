@@ -13,6 +13,6 @@ jobs:
         with:
           python-version: "3.x"
       - name: Compile Python source
-        run: python -m py_compile blueguard.py
+        run: python -m py_compile blueguard.py update.py
       - name: Check shell scripts
-        run: bash -n run.sh install-deps.sh check.sh
+        run: bash -n run.sh install-deps.sh check.sh update.sh
