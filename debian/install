@@ -1,0 +1,3 @@
+blueguard.py usr/share/blueguard-bluetooth-scanner/
+README.md usr/share/doc/blueguard-bluetooth-scanner/
+debian/blueguard usr/bin/blueguard
