@@ -12,7 +12,7 @@ Designed for authorized testing of devices you own or have permission to manage.
 
 ```bash
 sudo apt update
-sudo apt install bluez bluetooth rfkill python3 python3-tk
+sudo apt install bluez bluetooth rfkill python3 python3-tk git
 sudo systemctl enable --now bluetooth
 sudo rfkill unblock bluetooth
 ```
@@ -20,11 +20,28 @@ sudo rfkill unblock bluetooth
 ## Run from source
 
 ```bash
-chmod +x blueguard.py run.sh install-deps.sh
-./run.sh
+git clone https://github.com/sajinstalin01/blueguard-bluetooth-scanner.git
+cd blueguard-bluetooth-scanner
+bash run.sh
 ```
 
 Select Classic + BLE, Classic, or BLE and start a scan. Select a device row to populate its MAC address or enter a known address in `AA:BB:CC:DD:EE:FF` format. Pair and Connect prompt for authorization confirmation. Some BlueZ pairing flows require additional terminal interaction or physical confirmation on the speaker.
+
+## Update from GitHub
+
+From inside your cloned repository, run:
+
+```bash
+bash update.sh
+```
+
+The updater fetches the latest `main` branch and uses a fast-forward-only update. It stops if local changes, untracked files, a different branch, or diverged Git history are detected, so it will not silently overwrite your work. After updating, it runs the Python syntax check. Restart the app to use the new version:
+
+```bash
+bash run.sh
+```
+
+If you downloaded the source as a ZIP rather than cloning with Git, the updater cannot update that folder; clone the repository using the commands above.
 
 ## Export
 
@@ -36,7 +53,7 @@ Install packaging tools and build dependencies:
 
 ```bash
 sudo apt install build-essential debhelper dpkg-dev
- dpkg-buildpackage -us -uc -b
+dpkg-buildpackage -us -uc -b
 ```
 
 The generated `.deb` appears in the parent directory. Build dependencies include `debhelper-compat (= 13)`.
