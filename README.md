@@ -27,21 +27,32 @@ bash run.sh
 
 Select Classic + BLE, Classic, or BLE and start a scan. Select a device row to populate its MAC address or enter a known address in `AA:BB:CC:DD:EE:FF` format. Pair and Connect prompt for authorization confirmation. Some BlueZ pairing flows require additional terminal interaction or physical confirmation on the speaker.
 
-## Update from GitHub
+## Update from terminal
 
-From inside your cloned repository, run:
+Use either the Bash or Python updater from inside the cloned repository.
 
+Bash:
 ```bash
 bash update.sh
 ```
 
-The updater fetches the latest `main` branch and uses a fast-forward-only update. It stops if local changes, untracked files, a different branch, or diverged Git history are detected, so it will not silently overwrite your work. After updating, it runs the Python syntax check. Restart the app to use the new version:
+Python:
+```bash
+python3 update.py
+```
+
+To check whether an update is available without applying it:
+```bash
+python3 update.py --check-only
+```
+
+Both updaters fetch the latest `main` branch and use a fast-forward-only update. They stop if local changes, untracked files, a different branch, an unexpected remote, or diverged Git history are detected. The Python updater runs a syntax check after updating. Restart the app to use the new version:
 
 ```bash
 bash run.sh
 ```
 
-If you downloaded the source as a ZIP rather than cloning with Git, the updater cannot update that folder; clone the repository using the commands above.
+If you downloaded the source as a ZIP rather than cloning with Git, these updaters cannot update that folder; clone the repository using the commands above.
 
 ## Export
 
