@@ -5,6 +5,7 @@ import json
 import os
 import queue
 import re
+import select
 import shutil
 import subprocess
 import threading
@@ -156,10 +157,20 @@ class BlueGuard:
         start = time.monotonic()
         try:
             while not self.stop_event.is_set() and time.monotonic()-start < duration:
-                line = self.proc.stdout.readline() if self.proc and self.proc.stdout else ""
+                if not self.proc or not self.proc.stdout:
+                    break
+                # select() keeps the scan timeout responsive even when no device
+                # produces output; plain readline() can block indefinitely.
+                ready, _, _ = select.select([self.proc.stdout], [], [], 0.2)
+                if not ready:
+                    if self.proc.poll() is not None:
+                        break
+                    continue
+                line = self.proc.stdout.readline()
                 if not line:
-                    if self.proc and self.proc.poll() is not None: break
-                    time.sleep(.03); continue
+                    if self.proc.poll() is not None:
+                        break
+                    continue
                 self._parse_line(line.strip(),mode)
         except Exception as exc:
             self.events.put(("log",f"Scanner output error: {exc}"))
